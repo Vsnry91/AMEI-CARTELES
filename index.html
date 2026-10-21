@@ -263,19 +263,16 @@ function clearSession(){
 
 function showView(name){
   $('view-login').classList.toggle('hidden', name!=='login');
-  $('view-judge').classList.toggle('hidden', name!=='judge');
-  $('view-admin').classList.toggle('hidden', name!=='admin');
+  $('view-judge').classList.toggle('hidden', name!=='judge');$('view-admin').classList.toggle('hidden', name!=='admin');
 }
 
 // ---------- LOGIN ----------
-$('btn-login').addEventListener('click', doLogin);
-$('in-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('btn-login').addEventListener('click', doLogin);$('in-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 
 async function doLogin(){
   const nombre = $('in-nombre').value.trim();
   const pass = $('in-pass').value;
-  $('login-error').textContent = '';
-  $('login-offline').classList.add('hidden');
+  $('login-error').textContent = '';$('login-offline').classList.add('hidden');
   if(!nombre || !pass){ $('login-error').textContent = 'Escribe tu nombre y contraseña.'; return; }
 
   try{
@@ -301,13 +298,20 @@ async function doLogin(){
   }
 }
 
-$('btn-logout-j').addEventListener('click', logout);
-$('btn-logout-a').addEventListener('click', logout);
+$('btn-logout-j').addEventListener('click', logout);$('btn-logout-a').addEventListener('click', logout);
 function logout(){ session = null; clearSession(); $('in-pass').value=''; showView('login'); }
 
 // ---------- JUDGE ----------
 async function startJudge(){
-  $('judge-name').textContent = session.nombre;
+  // Extraer el número del nombre (ej. "evaluador 5" -> 5)
+  const numJuez = parseInt(session.nombre.replace(/\D/g, ''));
+  let infoSesion = "";
+  
+  if(numJuez >= 1 && numJuez <= 5) infoSesion = " | Sesión 1: JA42";
+  else if(numJuez >= 6 && numJuez <= 10) infoSesion = " | Sesión 2: VB36";
+  else if(numJuez >= 11 && numJuez <= 15) infoSesion = " | Sesión 3: VD40";
+
+  $('judge-name').textContent = session.nombre + infoSesion;
   showView('judge');
   $('judge-offline').classList.add('hidden');
   try{
@@ -347,7 +351,7 @@ function renderPosters(){
         ${scoreRowFor(p.id, 'diseno', 'Diseño', existing?.puntaje_diseno ?? 7)}
         ${scoreRowFor(p.id, 'presentacion', 'Presentación', existing?.puntaje_presentacion ?? 7)}
         <div class="field" style="margin-top:6px;">
-          <label>Comentarios (opcional)</label>
+          <label>Comentario diferenciador (clave para desempates)</label>
           <textarea id="com-${p.id}">${existing?.comentarios ? escapeHtml(existing.comentarios) : ''}</textarea>
         </div>
         <div class="poster-actions">
@@ -450,29 +454,48 @@ function renderAdmin(){
 
   const tbodyC = document.querySelector('#tbl-carteles tbody');
   tbodyC.innerHTML = '';
-  cList.forEach(p => {
+
+  // 1. Calcular promedios
+  const cartelesConPromedio = cList.map(p => {
     const rows = califs.filter(c => c.cartel_id === p.id);
-    let avg = '—';
+    let avg = 0;
     if(rows.length){
       const sum = rows.reduce((acc,r) => acc + (r.puntaje_contenido||0) + (r.puntaje_diseno||0) + (r.puntaje_presentacion||0), 0);
-      avg = (sum / (rows.length*3)).toFixed(1);
+      avg = sum / (rows.length * 3);
     }
+    return { ...p, avg, count: rows.length, rows };
+  });
+
+  // 2. Ordenar de mayor a menor calificación
+  cartelesConPromedio.sort((a, b) => b.avg - a.avg);
+
+  // 3. Imprimir en tabla con top 3 destacado
+  cartelesConPromedio.forEach((p, index) => {
+    let ranking = "";
+    if(p.count > 0) { // Solo dar medallas si ya fueron calificados
+      if(index === 0) ranking = " 🥇";
+      else if(index === 1) ranking = " 🥈";
+      else if(index === 2) ranking = " 🥉";
+    }
+
+    const avgDisplay = p.count ? p.avg.toFixed(1) : '—';
     const tr = document.createElement('tr');
     tr.className = 'cartel-row';
-    tr.innerHTML = `<td>${escapeHtml(p.titulo || ('Cartel '+p.numero))}</td>
-      <td class="num">${avg}</td>
-      <td class="num">${rows.length}</td>`;
+    // Se añade fontWeight bold a los ganadores
+    tr.innerHTML = `<td style="${index < 3 && p.count > 0 ? 'font-weight:bold; color:var(--gold);' : ''}">${escapeHtml(p.titulo || ('Cartel '+p.numero))}${ranking}</td>
+      <td class="num">${avgDisplay}</td>
+      <td class="num">${p.count}</td>`;
     tbodyC.appendChild(tr);
 
     const trComments = document.createElement('tr');
     trComments.className = 'comments-row';
     const juezMap = {}; jueces.forEach(j => juezMap[j.id] = j.nombre);
-    const commentsHtml = rows.length
-      ? rows.map(r => `
+    const commentsHtml = p.rows.length
+      ? p.rows.map(r => `
           <div class="comment-item">
             <div class="who">${escapeHtml(juezMap[r.juez_id] || 'Juez')}</div>
             <div class="sc">Contenido ${r.puntaje_contenido} · Diseño ${r.puntaje_diseno} · Presentación ${r.puntaje_presentacion}</div>
-            ${r.comentarios ? `<div class="txt">${escapeHtml(r.comentarios)}</div>` : ''}
+            ${r.comentarios ? `<div class="txt"><em>"${escapeHtml(r.comentarios)}"</em></div>` : ''}
           </div>`).join('')
       : '<div class="empty">Sin calificaciones todavía.</div>';
     trComments.innerHTML = `<td colspan="3"><div class="comments-box" id="comments-${p.id}">${commentsHtml}</div></td>`;
@@ -537,7 +560,7 @@ $('btn-add-juez').addEventListener('click', async () => {
   try{
     const { error } = await sb.from('jueces').insert({ nombre, password: pass });
     if(error) throw error;
-    $('new-juez-nombre').value=''; $('new-juez-pass').value='';
+    $('new-juez-nombre').value='';$('new-juez-pass').value='';
     startAdmin();
   }catch(err){ alert('No se pudo agregar. Revisa tu conexión.'); }
 });
@@ -550,7 +573,7 @@ $('btn-add-cartel').addEventListener('click', async () => {
   try{
     const { error } = await sb.from('carteles').insert({ numero, titulo, imagen_url: imagen_url || null });
     if(error) throw error;
-    $('new-cartel-numero').value=''; $('new-cartel-titulo').value=''; $('new-cartel-imagen').value='';
+    $('new-cartel-numero').value=''; $('new-cartel-titulo').value='';$('new-cartel-imagen').value='';
     startAdmin();
   }catch(err){ alert('No se pudo agregar. Revisa tu conexión.'); }
 });
