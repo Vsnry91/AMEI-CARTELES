@@ -33,6 +33,11 @@
     padding:22px 20px 18px;
     border-bottom:1px solid var(--line);
     display:flex; align-items:baseline; justify-content:space-between;
+    position: sticky; 
+    top: 0; 
+    z-index: 100; 
+    background: rgba(20, 24, 28, 0.95); /* Fondo oscuro semitransparente */
+    backdrop-filter: blur(8px);
   }
   header.top .brand{ font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); font-family: -apple-system, sans-serif; font-weight:600;}
   header.top .who{ font-size:13px; color:var(--ink-dim); font-family: -apple-system, sans-serif; }
@@ -94,6 +99,7 @@
     flex:1; background:var(--gold); color:#1b1509; border:none; padding:11px; border-radius:6px;
     font-family:-apple-system, sans-serif; font-weight:600; font-size:14px; cursor:pointer;
   }
+  .save-btn:active { transform: scale(0.98); opacity: 0.9; }
   .save-msg{ font-family:-apple-system, sans-serif; font-size:12px; color:var(--good); align-self:center; }
 
   /* Admin */
@@ -101,6 +107,8 @@
   .section-title:first-child{ margin-top:0; }
   table{ width:100%; border-collapse:collapse; font-family:-apple-system, sans-serif; font-size:14px; }
   th, td{ text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); }
+  td { line-height: 1.4; }
+  td:first-child { padding-right: 15px; } 
   th{ color:var(--ink-dim); font-weight:500; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
   td.num{ text-align:right; font-variant-numeric:tabular-nums; }
   .pill{ display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; }
@@ -466,15 +474,24 @@ async function startAdmin(){
 
 function renderAdmin(){
   const { jueces, carteles: cList, califs } = adminData;
-  const total = cList.length;
 
   const tbodyJ = document.querySelector('#tbl-jueces tbody');
   tbodyJ.innerHTML = '';
+  
   jueces.forEach(j => {
+    // Extraemos el número del juez para saber su meta exacta
+    const numJuez = parseInt(j.nombre.replace(/\D/g, ''));
+    let totalJuez = 0;
+    
+    if (numJuez >= 1 && numJuez <= 5) totalJuez = 19;
+    else if (numJuez >= 6 && numJuez <= 10) totalJuez = 21;
+    else if (numJuez >= 11 && numJuez <= 15) totalJuez = 18;
+    else totalJuez = cList.length;
+
     const count = califs.filter(c => c.juez_id === j.id).length;
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${escapeHtml(j.nombre)}</td>
-      <td class="num"><span class="pill ${count===total && total>0 ? 'complete':'pending'}">${count} / ${total}</span></td>`;
+      <td class="num"><span class="pill ${count===totalJuez && totalJuez>0 ? 'complete':'pending'}">${count} / ${totalJuez}</span></td>`;
     tbodyJ.appendChild(tr);
   });
 
